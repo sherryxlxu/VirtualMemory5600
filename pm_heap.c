@@ -26,78 +26,75 @@
 
 #define MAXSIZE 10
 
-int array_one[MAXSIZE];
-int array_two[MAXSIZE];
-int time_accessed;
-// int front = -1;
-// int rear = -1;
-// int size = -1;
-// int available =MAXSIZE;
+int queue[MAXSIZE];
+int front = -1;
+int rear = -1;
+int size = -1;
 pthread_t queue_thread;
-// void enqueue(int value){
-//   pthread_mutex_lock(&queue_mutex);
-//   if(size < MAXSIZE){
-//     if (size < 0){
-//       queue[0] = value;
-//       front = rear = 0;
-//       size = 1;
+void enqueue(int value){
+  pthread_mutex_lock(&queue_mutex);
+  if(size < MAXSIZE){
+    if (size < 0){
+      queue[0] = value;
+      front = rear = 0;
+      size = 1;
 
-//     } else if (rear == MAXSIZE - 1){
-//       queue[0] = value;
-//       rear = 0;
-//       size ++;
-//     } else {
-//     queue[rear + 1] = value;
-//     rear++;
-//     size ++;
-//   }
-//   } else{
-//     printf("queue is full\n");
-//   }
-//   pthread_mutex_unlock(&queue_mutex);
-// }
-// void swap(int value){
-//   pthread_mutex_lock(&queue_mutex);
-//   int temp;
-//   if (size < 0){
-//     printf("queue is empty\n");
-//   } else{
-//   temp = queue[front];
-//   queue[front] = queue[value];
-//   queue[value] = temp;
-//   dequeue();
-//   }
-//   pthread_mutex_unlock(&queue_mutex);
-// }
-// int dequeue(){
-//   // pthread_mutex_lock(&pm_mutex);
-//   if (size < 0){
-//     printf("queue is empty\n");
-//   } else {
-//     size --;
-//     front ++;
-//   }
-//   // pthread_mutex_unlock(&queue_mutex);
-// }
+    } else if (rear == MAXSIZE - 1){
+      queue[0] = value;
+      rear = 0;
+      size ++;
+    } else {
+    queue[rear + 1] = value;
+    rear++;
+    size ++;
+  }
+  } else{
+    printf("queue is full\n");
+  }
+  pthread_mutex_unlock(&queue_mutex);
+}
+void swap(int value){
+  pthread_mutex_lock(&queue_mutex);
+  int temp;
+  if (size < 0){
+    printf("queue is empty\n");
+  } else{
+  temp = queue[front];
+  queue[front] = queue[value];
+  queue[value] = temp;
+  dequeue();
+  }
+  pthread_mutex_unlock(&queue_mutex);
+}
+int dequeue(){
+  // pthread_mutex_lock(&pm_mutex);
+  if (size < 0){
+    printf("queue is empty\n");
+  } else {
+    size --;
+    front ++;
+  }
+  // pthread_mutex_unlock(&queue_mutex);
+}
 
-// void display() {
-//   pthread_mutex_lock(&queue_mutex);
-//     int i;
-//     if(rear>=front) {
-//         for(i=front;i<=rear;i++){
-//             printf("%d\n",queue[i]);
-//         }
-//     } else
-//     {
-//         for(i=front;i<MAXSIZE;i++){
-//             printf("%d\n",queue[i]);
-//         }
-//         for(i=0;i<=rear;i++){
-//             printf("%d\n",queue[i]);
-//         }
-//     }
-//   pthread_mutex_unlock(&queue_mutex);
-// }
+void display() {
+  pthread_mutex_lock(&queue_mutex);
+    int i;
+    if(rear>=front) {
+        for(i=front;i<=rear;i++){
+            printf("%d\n",queue[i]);
+        }
+    } else
+    {
+        for(i=front;i<MAXSIZE;i++){
+            printf("%d\n",queue[i]);
+        }
+        for(i=0;i<=rear;i++){
+            printf("%d\n",queue[i]);
+        }
+    }
+  pthread_mutex_unlock(&queue_mutex);
+}
 
 /*
   * pm_malloc()-allocate size into an available page in heap
@@ -144,28 +141,25 @@ void *pm_malloc(size_t size){
     }
     for (int k = i; k < i + count; k++){ /* update the allocation of pm_page[] according to count  */
       pm_page[k] = 1;
-      array_one[k] = time_accessed++;
-      // available--;
-      // pthread_create(&queue_thread,NULL,enqueue,k);
-      // pthread_join(queue_thread,NULL);
+      pthread_create(&queue_thread,NULL,enqueue,k);
+      pthread_join(queue_thread,NULL);
     }
     pm_page[i] = nums;                   /* pm_page[i] store the nums, so we could know how many pages need to be freed */
     slot = pm_heap +(PM_PAGE_SIZE * i);
     break;
   }
-  // int available = 0;                    /* check the situation of pages  */
+  int available = 0;                    /* check the situation of pages  */
   int length = sizeof(pm_page) / sizeof(pm_page[0]);
   for(int i = 0; i < length;i++){
     printf("pm_page_malloc %d: %d\n",i, pm_page[i]);
-    printf("array_one record the accessing time of each page. Page num %d: %d\n", i, array_one[i]);
-    // if (pm_page[i] == 0){
-    //   available++;
-    // } 
+    if (pm_page[i] == 0){
+      available++;
+    } 
   }
-  // display();
+  display();
   // sleep(1);
   // return available pages;
-  // printf("Available pages in heap after malloc: %d\n",available);
+  printf("Available pages in heap after malloc: %d\n",available);
 
   return slot;
 
@@ -185,27 +179,24 @@ void *pm_malloc(size_t size){
   int i;
   for (i = 0; i < pm_page[page_index]; i++){                /* free all the pages that have been allocated before  */
       pm_page[i+page_index] = 0;
-      array_one[i+page_index]=-1;
-      // available++;
-      // for (int j = 0; j <sizeof(queue)/sizeof(queue[0]);j++){
-      //   if (queue[j] == i+page_index){
-      //     pthread_create(&queue_thread,NULL,swap,j);
-      //     pthread_join(queue_thread,NULL);
-      //   }
-      // }
+      for (int j = 0; j <sizeof(queue)/sizeof(queue[0]);j++){
+        if (queue[j] == i+page_index){
+          pthread_create(&queue_thread,NULL,swap,j);
+          pthread_join(queue_thread,NULL);
+        }
+      }
   }
-  // int available = 0;
+  int available = 0;
   int length = sizeof(pm_page) / sizeof(pm_page[0]);        /* check the situation of pages  */
   for(int i = 0; i < length;i++){
-    printf("pm_page_freed %d: %d\n",i, pm_page[i]);
-    printf("array_one record the freed time of each page. Page num %d: %d\n", i, array_one[i]);
-    // if (pm_page[i] == 0){
-    //   available++;
-    // }
+    printf("pm_page_freed: %d\n",pm_page[i]);
+    if (pm_page[i] == 0){
+      available++;
+    }
   }
-  // display();
+  display();
   // return count;
-  // printf("Available pages in heap after free: %d\n",available);
+  printf("Available pages in heap after free: %d\n",available);
 }
 
  /*
