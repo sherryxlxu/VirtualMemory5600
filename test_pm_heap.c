@@ -19,7 +19,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
-#define NUM_THREADS 10
+#define NUM_THREADS 20
 void* pm_malloc_results[10];
 
 
@@ -62,7 +62,10 @@ int main() {
   for (int i = 1; i < 7; i++){
     pthread_join(threadsFree[i], NULL);
   }
-
+  usleep(10000);
+  pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
+  pthread_join(threadExtra, NULL);
+  usleep(10000);
   /* 
    * Test Case 4: Allocate additional page in heap that is not full. The available pages after malloc is going to be 5
    */

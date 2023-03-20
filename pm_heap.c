@@ -124,17 +124,41 @@ void *pm_malloc(size_t size){
   int page_index = (ptr - (void*)phys_mem) / (1024*1024);   /* find how many pages need to be freed  */
   printf("page_index: %d\n",page_index);
   if(virtual_page[page_index] >= 0){
+    printf("page_index: %d\n",page_index);
     int temp = virtual_page[page_index];
     virtual_page[page_index] = -1;
     time_page[temp] = -1;
-    phys_page[temp] = 0;
-    counter--;
+
     for (int j= temp; j < PAGE_NUM - 1; j ++){
       int temp_a =time_page[j];
       time_page[j] =time_page[j+1];
-      time_page[j+1]=temp;
+      time_page[j+1]=temp_a;
+      printf("time_page: %d\n",time_page[j+1]);
     }
+
+    for (int i = 0; i < PAGE_NUM; i++){
+    if (time_page[i] == -1){
+      continue;
+    }
+    int index = time_page[i];
+    virtual_page[index] = i;
   }
+    
+
+  }
+
+   for(int i = 0; i < PAGE_NUM; i++){
+      if (time_page[i] == -1){
+        phys_page[i] = 0;
+      }
+    }
+    int new_count;
+    for(int i = 0; i < PAGE_NUM; i++){
+      if (phys_page[i] == 1){
+        new_count++;
+      }
+    }
+    counter = new_count;
   // for(int i = 0; i < VIRTUAL_NUM - PAGE_NUM; i++){
   //   if(virtual_page[i] == page_index){
   //     printf("page_index: %d\n",page_index);
@@ -154,13 +178,7 @@ void *pm_malloc(size_t size){
     
   // }
   //update virtual memory
-  for (int i = 0; i < PAGE_NUM; i++){
-    if (time_page[i] == -1){
-      continue;
-    }
-    int index = time_page[i];
-    virtual_page[index] = i;
-  }
+  
  
   // int index_free = page_index; 
   // phys_page[index_free] = 0;
