@@ -24,145 +24,88 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#define MAXSIZE 10
-
-int queue[MAXSIZE];
-int front = -1;
-int rear = -1;
-int size = -1;
-pthread_t queue_thread;
-void enqueue(int value){
+void initialize_virtual(){
   pthread_mutex_lock(&queue_mutex);
-  if(size < MAXSIZE){
-    if (size < 0){
-      queue[0] = value;
-      front = rear = 0;
-      size = 1;
-
-    } else if (rear == MAXSIZE - 1){
-      queue[0] = value;
-      rear = 0;
-      size ++;
-    } else {
-    queue[rear + 1] = value;
-    rear++;
-    size ++;
-  }
-  } else{
-    printf("queue is full\n");
+  int length;
+  length = sizeof(virtual_page)/sizeof(virtual_page[0]);
+  // printf("length: %d\n, %d\n, %d\n",sizeof(virtual_page),sizeof(virtual_page[0]), length);
+  // printf("PAGE_NUM:%d, %d, %d\n", PM_HEAP_SIZE, PM_PAGE_SIZE, (PM_HEAP_SIZE/PM_PAGE_SIZE));
+  for(int i = 0; i < length; i++){
+    virtual_page[i] = -1;
+    printf("virtual_malloc %d: %d\n", i, virtual_page[i]);
   }
   pthread_mutex_unlock(&queue_mutex);
 }
-void swap(int value){
-  pthread_mutex_lock(&queue_mutex);
-  int temp;
-  if (size < 0){
-    printf("queue is empty\n");
-  } else{
-  temp = queue[front];
-  queue[front] = queue[value];
-  queue[value] = temp;
-  dequeue();
-  }
-  pthread_mutex_unlock(&queue_mutex);
-}
-int dequeue(){
-  // pthread_mutex_lock(&pm_mutex);
-  if (size < 0){
-    printf("queue is empty\n");
-  } else {
-    size --;
-    front ++;
-  }
-  // pthread_mutex_unlock(&queue_mutex);
-}
-
-void display() {
-  pthread_mutex_lock(&queue_mutex);
-    int i;
-    if(rear>=front) {
-        for(i=front;i<=rear;i++){
-            printf("%d\n",queue[i]);
-        }
-    } else
-    {
-        for(i=front;i<MAXSIZE;i++){
-            printf("%d\n",queue[i]);
-        }
-        for(i=0;i<=rear;i++){
-            printf("%d\n",queue[i]);
-        }
-    }
-  pthread_mutex_unlock(&queue_mutex);
-}
-
-/*
-  * pm_malloc()-allocate size into an available page in heap
-  * 
-  * size: size need to be allocated
-  *
-  */
-
 void *pm_malloc(size_t size){
-  
+  //find an available space in virtual page
+  //size of virtual memory is twice as physical memory
+  //virtual memory: index is page number, content is the time that allocated
+  int i = 0;
+  void *slot = NULL;
+  //counter for calculate the order
+  // int counter=0;
+  printf("counter1: %d\n", counter);
+  if (counter > 9){
+    //free helper
+    //update virtual Memory
+    //get the index from time_page
+    int index_swap = time_page[0];
+    //move the index to swap space
+    for (int j = 0; j < PAGE_NUM; j++) {
+      if (virtual_page[j + VIRTUAL_NUM-PAGE_NUM] < 0){
+        virtual_page[j + VIRTUAL_NUM-PAGE_NUM] = index_swap;
+        break;
+        //todo: put index_swap into swapfile
+      }
+    }
+    //free time_page
+    void *swap_slot = phys_mem + PM_PAGE_SIZE * 0;
 
-  
-  if(size <= 0 || size > PM_HEAP_SIZE) {  /* check if size is suitable for heap  */
+    pm_swap_helper(swap_slot);
+    // pm_malloc_helper()
+    
+  }
+  printf("counter2: %d\n", counter);
+  while (i < (VIRTUAL_NUM-PAGE_NUM)) {
+    if(counter > 9){
+      
+      break;
+    }
+    if (virtual_page[i] == -1){
+      //update virtual page
+      virtual_page[i] = counter;
+      //update time page according to virtual page
+      time_page[counter] = i;
+      //update physical page according to time_page
+      phys_page[counter] = 1;
+      counter ++;
+      printf("counter3: %d\n", counter);
+      slot = phys_mem + PM_PAGE_SIZE * i;
+      break;
+      
+    }
+    
+    i++;
+
+  }
+  //virtual memory is full
+  if (i == (VIRTUAL_NUM-PAGE_NUM)){
+    printf("Virtual memory is full.\n");
     return NULL;
   }
-  int nums = size / PM_PAGE_SIZE;         /* calculate how many page does this size need  */
 
-  if (size % PM_PAGE_SIZE != 0){
-    nums += 1;
+  printf("counter: %d\n", counter);
+  // int length = sizeof(virtual_page)/sizeof(virtual_page[0]);
+  for (int m=0; m < VIRTUAL_NUM ; m++){
+    printf("virtual_malloc %d: %d\n", m, virtual_page[m]);
   }
-  int i = 0;                              /* iterate to an available page  */
-  void *slot = NULL;
-  while (i < page_num){
-    if(pm_page[i] == 1){                  /* if the page is allocated, move to next one  */
-      i++;
-      continue;
-    }
-    if (i + nums > page_num) {            /* if current page index plus additional page needed is greater than page num, break*/
-      break;
-    }                                     /* pm_page[i] is now empty  */
-    int count = 0;
-    for(int j = i; j < i + nums; j++){    /* find continuous empty blocks for size  */
-      if (pm_page[j] != 0){
-        break;
-      }
-      count ++;
-    }
-    if (count != nums){                   /* not enough pages for insert size, update index i to continue looking for available pages  */
-      i += count;
-      if (i>=page_num){                   /* not enough pages for insert size, allocation failed  */
-        return NULL;
-      }
-      continue;
-    }
-    for (int k = i; k < i + count; k++){ /* update the allocation of pm_page[] according to count  */
-      pm_page[k] = 1;
-      pthread_create(&queue_thread,NULL,enqueue,k);
-      pthread_join(queue_thread,NULL);
-    }
-    pm_page[i] = nums;                   /* pm_page[i] store the nums, so we could know how many pages need to be freed */
-    slot = pm_heap +(PM_PAGE_SIZE * i);
-    break;
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("time_malloc %d: %d\n", m, time_page[m]);
   }
-  int available = 0;                    /* check the situation of pages  */
-  int length = sizeof(pm_page) / sizeof(pm_page[0]);
-  for(int i = 0; i < length;i++){
-    printf("pm_page_malloc %d: %d\n",i, pm_page[i]);
-    if (pm_page[i] == 0){
-      available++;
-    } 
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("phys_malloc %d: %d\n", m, phys_page[m]);
   }
-  display();
-  // sleep(1);
-  // return available pages;
-  printf("Available pages in heap after malloc: %d\n",available);
-
   return slot;
-
 }
 
  /*
@@ -175,28 +118,167 @@ void *pm_malloc(size_t size){
   if (ptr == NULL){
     return;
   }
-  int page_index = (ptr - (void*)pm_heap) / PM_PAGE_SIZE;   /* find how many pages need to be freed  */
-  int i;
-  for (i = 0; i < pm_page[page_index]; i++){                /* free all the pages that have been allocated before  */
-      pm_page[i+page_index] = 0;
-      for (int j = 0; j <sizeof(queue)/sizeof(queue[0]);j++){
-        if (queue[j] == i+page_index){
-          pthread_create(&queue_thread,NULL,swap,j);
-          pthread_join(queue_thread,NULL);
-        }
-      }
+  if (counter < 0){
+    return;
   }
-  int available = 0;
-  int length = sizeof(pm_page) / sizeof(pm_page[0]);        /* check the situation of pages  */
-  for(int i = 0; i < length;i++){
-    printf("pm_page_freed: %d\n",pm_page[i]);
-    if (pm_page[i] == 0){
-      available++;
+  int page_index = (ptr - (void*)phys_mem) / (1024*1024);   /* find how many pages need to be freed  */
+  printf("page_index: %d\n",page_index);
+  if(virtual_page[page_index] >= 0){
+    int temp = virtual_page[page_index];
+    virtual_page[page_index] = -1;
+    time_page[temp] = -1;
+    phys_page[temp] = 0;
+    counter--;
+    for (int j= temp; j < PAGE_NUM - 1; j ++){
+      int temp_a =time_page[j];
+      time_page[j] =time_page[j+1];
+      time_page[j+1]=temp;
     }
   }
-  display();
-  // return count;
-  printf("Available pages in heap after free: %d\n",available);
+  // for(int i = 0; i < VIRTUAL_NUM - PAGE_NUM; i++){
+  //   if(virtual_page[i] == page_index){
+  //     printf("page_index: %d\n",page_index);
+  //     int temp = page_index;
+  //     virtual_page[temp] = -1;
+  //     time_page[i] = -1;
+  //     for (int j = i; j < PAGE_NUM - 1; j++){
+  //       int temp_a = time_page[j];
+  //       time_page[j] = time_page[j + 1];
+  //       time_page[j+1] = temp;
+  //     // printf("time_page: %d\n",time_page[i+1]);
+  //     } 
+  //     phys_page[i] = 0;
+  //     counter --;
+  //     break;
+  //   }
+    
+  // }
+  //update virtual memory
+  for (int i = 0; i < PAGE_NUM; i++){
+    if (time_page[i] == -1){
+      continue;
+    }
+    int index = time_page[i];
+    virtual_page[index] = i;
+  }
+ 
+  // int index_free = page_index; 
+  // phys_page[index_free] = 0;
+  // counter -= 1;
+  // int free_page = virtual_page[page_index];
+  // time_page[free_page] = -1;
+  // phys_page[free_page] = 0;
+  // virtual_page[page_index] = -1;
+  // // virtual_page[free_page] = -1;
+  // // time_page[index_free] = -1;
+  // // printf("index_free: %d\n",index_free);
+  // // printf("free_page: %d\n",free_page);
+  // for (int i = free_page; i < PAGE_NUM - 1; i++){
+  //   int temp = time_page[i];
+  //   time_page[i] = time_page[i + 1];
+  //   time_page[i+1] = temp;
+  //   // printf("time_page: %d\n",time_page[i+1]);
+  // }
+  // //update virtual memory
+  // for (int i = 0; i < PAGE_NUM; i++){
+  //   if (time_page[i] == -1){
+  //     continue;
+  //   }
+  //   int index = time_page[i];
+  //   virtual_page[index] = i;
+  // }
+  // counter -=1;
+  // phys_page[free_page]=0;
+
+  printf("counter: %d\n", counter);
+  for (int m=0; m < VIRTUAL_NUM ; m++){
+    printf("virtuafree %d: %d\n", m, virtual_page[m]);
+  }
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("time_free %d: %d\n", m, time_page[m]);
+  }
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("phys_free %d: %d\n", m, phys_page[m]);
+  }
+
+}
+
+void* pm_swap_helper(void *ptr){
+  if (ptr == NULL){
+    return;
+  }
+  if (counter < 0){
+    return;
+  }
+  int page_index = (ptr - (void*)phys_mem) / PM_PAGE_SIZE;   /* find how many pages need to be freed  */
+ 
+  int index_free = page_index; 
+  int free_page = time_page[index_free]; 
+  virtual_page[free_page] = -4;
+  time_page[index_free] = -1;
+  printf("index_free: %d\n",index_free);
+   printf("free_page: %d\n",free_page);
+  for (int i = index_free; i < PAGE_NUM - 1; i++){
+    int temp = time_page[i];
+    time_page[i] = time_page[i + 1];
+    time_page[i+1] = temp;
+   
+  }
+  //update virtual memory
+  for (int i = 0; i < PAGE_NUM; i++){
+    if (time_page[i] == -1){
+      continue;
+    }
+    int index = time_page[i];
+    virtual_page[index] = i;
+  }
+  if (ptr == NULL){
+    return;
+  }
+  if (counter < 0){
+    return;
+  }
+  // int page_index = (ptr - (void*)phys_mem) / (1024*1024);   /* find how many pages need to be freed  */
+ 
+  // // int index_free = page_index; 
+  // // phys_page[index_free] = 0;
+  // counter -= 1;
+  // int free_page = virtual_page[page_index];
+  // time_page[free_page] = -1;
+  // phys_page[page_index] = 1;
+  // virtual_page[page_index] = -1;
+  // // virtual_page[free_page] = -1;
+  // // time_page[index_free] = -1;
+  // // printf("index_free: %d\n",index_free);
+  // // printf("free_page: %d\n",free_page);
+  // for (int i = free_page; i < PAGE_NUM - 1; i++){
+  //   int temp = time_page[i];
+  //   time_page[i] = time_page[i + 1];
+  //   time_page[i+1] = temp;
+  //   // printf("time_page: %d\n",time_page[i+1]);
+  // }
+  // //update virtual memory
+  // for (int i = 0; i < PAGE_NUM; i++){
+  //   if (time_page[i] == -1){
+  //     continue;
+  //   }
+  //   int index = time_page[i];
+  //   virtual_page[index] = i;
+  // }
+  counter -=1;
+  phys_page[index_free]=1;
+
+  printf("counter: %d\n", counter);
+  for (int m=0; m < VIRTUAL_NUM ; m++){
+    printf("virtuafree %d: %d\n", m, virtual_page[m]);
+  }
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("time_free %d: %d\n", m, time_page[m]);
+  }
+  for (int m=0; m < PAGE_NUM ; m++){
+    printf("phys_free %d: %d\n", m, phys_page[m]);
+  }
+
 }
 
  /*

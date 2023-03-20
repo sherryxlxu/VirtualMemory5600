@@ -20,15 +20,18 @@
 #include <pthread.h>
 #include <semaphore.h>
 #define NUM_THREADS 10
-void* pm_malloc_results[PM_HEAP_SIZE/PM_PAGE_SIZE];
+void* pm_malloc_results[10];
 
 
  //Main program
 int main() {
-  pthread_t threads[NUM_THREADS], threadsFree[NUM_THREADS],threadExtra;
+  pthread_t threads[NUM_THREADS], threadsFree[NUM_THREADS],threadExtra,queue_thread;
 
   pthread_mutex_init(&pm_mutex,NULL);
   pthread_mutex_init(&queue_mutex,NULL);
+
+  pthread_create(&queue_thread, NULL, initialize_virtual,NULL);
+  pthread_join(queue_thread,NULL);
   
 
   /*
@@ -42,13 +45,13 @@ int main() {
     pthread_join(threads[i], &pm_malloc_results[i]); /* Store the pointers in the pm_malloc_result array */
   }
 
-  /*
-   * Test Case 2: Allocate additional page as heap is full. The available pages after malloc is going to be 0
-   */
-  usleep(10000);
-  pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
-  pthread_join(threadExtra, NULL);
-  usleep(10000);
+  // /*
+  //  * Test Case 2: Allocate additional page as heap is full. The available pages after malloc is going to be 0
+  //  */
+  // usleep(10000);
+  // pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
+  // pthread_join(threadExtra, NULL);
+  // usleep(10000);
 
   /*
    * Test Case 3: Free random pages in heap. The available pages after free is going to be 6
@@ -63,11 +66,11 @@ int main() {
   /* 
    * Test Case 4: Allocate additional page in heap that is not full. The available pages after malloc is going to be 5
    */
-  usleep(10000);
-  pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
-  pthread_join(threadExtra, NULL);
-  usleep(10000);
-  
+  // usleep(10000);
+  // pthread_create(&threadExtra,NULL,pm_free_wrapper,pm_malloc_results[1]);
+  // pthread_join(threadExtra, NULL);
+  // usleep(10000);
+  // printf("%d\n",PAGE_NUM);
   pthread_mutex_destroy(&pm_mutex);
   pthread_mutex_destroy(&queue_mutex);
   return 0;
