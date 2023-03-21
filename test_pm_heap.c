@@ -19,16 +19,18 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <string.h>
 #define NUM_THREADS 20
 void* pm_malloc_results[10];
 
 
  //Main program
 int main() {
-  pthread_t threads[NUM_THREADS], threadsFree[NUM_THREADS],threadExtra,queue_thread;
+  pthread_t threads[NUM_THREADS], threadsFree[NUM_THREADS],threadExtra,queue_thread,access_thread;
 
   pthread_mutex_init(&pm_mutex,NULL);
-  pthread_mutex_init(&queue_mutex,NULL);
+  // pthread_mutex_init(&queue_mutex,NULL);
+  // pthread_mutex_init(&access_mutex,NULL);
 
   pthread_create(&queue_thread, NULL, initialize_virtual,NULL);
   pthread_join(queue_thread,NULL);
@@ -39,7 +41,7 @@ int main() {
    */
   for (int i = 0; i < NUM_THREADS; i++) {
     // thread_args[i] = 1;
-    pthread_create(&threads[i], NULL, pm_malloc_wrapper,1);
+    pthread_create(&threads[i], NULL, pm_malloc_wrapper,i+1);
   }
   for (int i = 0; i < NUM_THREADS; i++) {
     pthread_join(threads[i], &pm_malloc_results[i]); /* Store the pointers in the pm_malloc_result array */
@@ -62,20 +64,26 @@ int main() {
   for (int i = 1; i < 7; i++){
     pthread_join(threadsFree[i], NULL);
   }
-  usleep(10000);
-  pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
-  pthread_join(threadExtra, NULL);
-  usleep(10000);
+  // usleep(10000);
+  // pthread_create(&threadExtra,NULL,pm_malloc_wrapper,1);
+  // pthread_join(threadExtra, NULL);
+  // usleep(10000);
   /* 
    * Test Case 4: Allocate additional page in heap that is not full. The available pages after malloc is going to be 5
    */
+  int result;
   // usleep(10000);
   // pthread_create(&threadExtra,NULL,pm_free_wrapper,pm_malloc_results[1]);
   // pthread_join(threadExtra, NULL);
   // usleep(10000);
   // printf("%d\n",PAGE_NUM);
+  pthread_create(&access_thread, NULL, access_page,14);
+  pthread_join(access_thread,result);
+  // printf("result: %d\n", result);
+  // access_page(2);
   pthread_mutex_destroy(&pm_mutex);
-  pthread_mutex_destroy(&queue_mutex);
+  // pthread_mutex_destroy(&access_mutex);
+  // pthread_mutex_destroy(&queue_mutex);
   return 0;
 
 

@@ -23,9 +23,10 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <string.h>
 
 void initialize_virtual(){
-  pthread_mutex_lock(&queue_mutex);
+  pthread_mutex_lock(&pm_mutex);
   int length;
   length = sizeof(virtual_page)/sizeof(virtual_page[0]);
   // printf("length: %d\n, %d\n, %d\n",sizeof(virtual_page),sizeof(virtual_page[0]), length);
@@ -34,9 +35,16 @@ void initialize_virtual(){
     virtual_page[i] = -1;
     printf("virtual_malloc %d: %d\n", i, virtual_page[i]);
   }
-  pthread_mutex_unlock(&queue_mutex);
+  for(int i = 0; i < PAGE_NUM; i++){
+    phys_page[i] = -1;
+    printf("phys_init %d: %d\n", i, phys_page[i]);
+  }
+  pthread_mutex_unlock(&pm_mutex);
 }
 void *pm_malloc(size_t size){
+  if(size <= 0 || size > PM_HEAP_SIZE) {  /* check if size is suitable for heap  */
+    return NULL;
+  }
   //find an available space in virtual page
   //size of virtual memory is twice as physical memory
   //virtual memory: index is page number, content is the time that allocated
@@ -50,19 +58,21 @@ void *pm_malloc(size_t size){
     //update virtual Memory
     //get the index from time_page
     int index_swap = time_page[0];
-    //move the index to swap space
-    for (int j = 0; j < PAGE_NUM; j++) {
-      if (virtual_page[j + VIRTUAL_NUM-PAGE_NUM] < 0){
-        virtual_page[j + VIRTUAL_NUM-PAGE_NUM] = index_swap;
-        break;
-        //todo: put index_swap into swapfile
-      }
-    }
+    int value = phys_page[0];
+    // printf("index_swap: %d\n", index_swap);
+    // //move the index to swap space
+    // for (int j = 0; j < PAGE_NUM; j++) {
+    //   if (virtual_page[j + VIRTUAL_NUM-PAGE_NUM] < 0){
+    //     virtual_page[j + VIRTUAL_NUM-PAGE_NUM] = index_swap;
+    //     storeArray(index_swap,value);
+    //     break;
+    //   }
+    // }
     //free time_page
     void *swap_slot = phys_mem + PM_PAGE_SIZE * 0;
-
-    pm_swap_helper(swap_slot);
-    // pm_malloc_helper()
+    printf("index_swap %d\n: %d\n",index_swap, value);
+    pm_swap_helper(swap_slot,index_swap,value);
+    // pm_malloc_helper(size, counter);
     
   }
   printf("counter2: %d\n", counter);
@@ -77,7 +87,7 @@ void *pm_malloc(size_t size){
       //update time page according to virtual page
       time_page[counter] = i;
       //update physical page according to time_page
-      phys_page[counter] = 1;
+      phys_page[counter] = size;
       counter ++;
       printf("counter3: %d\n", counter);
       slot = phys_mem + PM_PAGE_SIZE * i;
@@ -123,6 +133,16 @@ void *pm_malloc(size_t size){
   }
   int page_index = (ptr - (void*)phys_mem) / (1024*1024);   /* find how many pages need to be freed  */
   printf("page_index: %d\n",page_index);
+  if(virtual_page[page_index] == -4){
+    for(int i = 0; i < PAGE_NUM; i++){
+      if (virtual_page[i + VIRTUAL_NUM - PAGE_NUM] == page_index){
+        removeFile(virtual_page[i + VIRTUAL_NUM - PAGE_NUM]);
+        virtual_page[i + VIRTUAL_NUM - PAGE_NUM] =-1;
+        virtual_page[page_index] = -1;
+        
+      }
+    }
+  }
   if(virtual_page[page_index] >= 0){
     printf("page_index: %d\n",page_index);
     int temp = virtual_page[page_index];
@@ -148,67 +168,24 @@ void *pm_malloc(size_t size){
   }
 
    for(int i = 0; i < PAGE_NUM; i++){
-      if (time_page[i] == -1){
-        phys_page[i] = 0;
-      }
-    }
-    int new_count;
-    for(int i = 0; i < PAGE_NUM; i++){
-      if (phys_page[i] == 1){
-        new_count++;
-      }
-    }
-    counter = new_count;
-  // for(int i = 0; i < VIRTUAL_NUM - PAGE_NUM; i++){
-  //   if(virtual_page[i] == page_index){
-  //     printf("page_index: %d\n",page_index);
-  //     int temp = page_index;
-  //     virtual_page[temp] = -1;
-  //     time_page[i] = -1;
-  //     for (int j = i; j < PAGE_NUM - 1; j++){
-  //       int temp_a = time_page[j];
-  //       time_page[j] = time_page[j + 1];
-  //       time_page[j+1] = temp;
-  //     // printf("time_page: %d\n",time_page[i+1]);
-  //     } 
-  //     phys_page[i] = 0;
-  //     counter --;
-  //     break;
-  //   }
-    
-  // }
-  //update virtual memory
-  
- 
-  // int index_free = page_index; 
-  // phys_page[index_free] = 0;
-  // counter -= 1;
-  // int free_page = virtual_page[page_index];
-  // time_page[free_page] = -1;
-  // phys_page[free_page] = 0;
-  // virtual_page[page_index] = -1;
-  // // virtual_page[free_page] = -1;
-  // // time_page[index_free] = -1;
-  // // printf("index_free: %d\n",index_free);
-  // // printf("free_page: %d\n",free_page);
-  // for (int i = free_page; i < PAGE_NUM - 1; i++){
-  //   int temp = time_page[i];
-  //   time_page[i] = time_page[i + 1];
-  //   time_page[i+1] = temp;
-  //   // printf("time_page: %d\n",time_page[i+1]);
-  // }
-  // //update virtual memory
-  // for (int i = 0; i < PAGE_NUM; i++){
-  //   if (time_page[i] == -1){
-  //     continue;
-  //   }
-  //   int index = time_page[i];
-  //   virtual_page[index] = i;
-  // }
-  // counter -=1;
-  // phys_page[free_page]=0;
 
-  printf("counter: %d\n", counter);
+      if (time_page[i] == -1){
+
+        phys_page[i] = -1;
+      }
+    }
+    int new_count = 0;
+    for(int i = 0; i < PAGE_NUM; i++){
+      if (phys_page[i] >= 0){
+        printf("i: %d\n", new_count);
+        new_count +=1;
+      }
+      counter=new_count;
+    }
+    
+ 
+
+  printf("counter: %d new_count: %d\n", counter, new_count);
   for (int m=0; m < VIRTUAL_NUM ; m++){
     printf("virtuafree %d: %d\n", m, virtual_page[m]);
   }
@@ -221,22 +198,27 @@ void *pm_malloc(size_t size){
 
 }
 
-void* pm_swap_helper(void *ptr){
+void* pm_swap_helper(void *ptr, int index_swap, int value){
   if (ptr == NULL){
     return;
   }
   if (counter < 0){
     return;
   }
-  int page_index = (ptr - (void*)phys_mem) / PM_PAGE_SIZE;   /* find how many pages need to be freed  */
+  // int page_index = (ptr - (void*)phys_mem) / PM_PAGE_SIZE;    find how many pages need to be freed  
  
-  int index_free = page_index; 
-  int free_page = time_page[index_free]; 
-  virtual_page[free_page] = -4;
-  time_page[index_free] = -1;
-  printf("index_free: %d\n",index_free);
-   printf("free_page: %d\n",free_page);
-  for (int i = index_free; i < PAGE_NUM - 1; i++){
+  // int index_free = page_index; 
+  // int free_page = time_page[index_free]; 
+  for (int j = 0; j < PAGE_NUM; j++) {
+      if (virtual_page[j + VIRTUAL_NUM-PAGE_NUM] < 0){
+        virtual_page[j + VIRTUAL_NUM-PAGE_NUM] = index_swap;
+        storeArray(index_swap,value);
+        break;
+      }
+  }
+  virtual_page[index_swap] = -4;
+  time_page[0] = -1;
+  for (int i = 0; i < PAGE_NUM - 1; i++){
     int temp = time_page[i];
     time_page[i] = time_page[i + 1];
     time_page[i+1] = temp;
@@ -256,46 +238,23 @@ void* pm_swap_helper(void *ptr){
   if (counter < 0){
     return;
   }
-  // int page_index = (ptr - (void*)phys_mem) / (1024*1024);   /* find how many pages need to be freed  */
- 
-  // // int index_free = page_index; 
-  // // phys_page[index_free] = 0;
-  // counter -= 1;
-  // int free_page = virtual_page[page_index];
-  // time_page[free_page] = -1;
-  // phys_page[page_index] = 1;
-  // virtual_page[page_index] = -1;
-  // // virtual_page[free_page] = -1;
-  // // time_page[index_free] = -1;
-  // // printf("index_free: %d\n",index_free);
-  // // printf("free_page: %d\n",free_page);
-  // for (int i = free_page; i < PAGE_NUM - 1; i++){
-  //   int temp = time_page[i];
-  //   time_page[i] = time_page[i + 1];
-  //   time_page[i+1] = temp;
-  //   // printf("time_page: %d\n",time_page[i+1]);
-  // }
-  // //update virtual memory
-  // for (int i = 0; i < PAGE_NUM; i++){
-  //   if (time_page[i] == -1){
-  //     continue;
-  //   }
-  //   int index = time_page[i];
-  //   virtual_page[index] = i;
-  // }
-  counter -=1;
-  phys_page[index_free]=1;
+  // counter -=1;
+  phys_page[0]=-1;
+  for (int i = 0; i < PAGE_NUM - 1; i++){
+    int temp = phys_page[i];
+    phys_page[i] = phys_page[i + 1];
+    phys_page[i+1] = temp;
+   
+  }
+  int new_count;
+  for(int i = 0; i < PAGE_NUM; i++){
+    if (phys_page[i] >= 0){
+      new_count++;
+    }
+  }
+  counter = new_count;
 
-  printf("counter: %d\n", counter);
-  for (int m=0; m < VIRTUAL_NUM ; m++){
-    printf("virtuafree %d: %d\n", m, virtual_page[m]);
-  }
-  for (int m=0; m < PAGE_NUM ; m++){
-    printf("time_free %d: %d\n", m, time_page[m]);
-  }
-  for (int m=0; m < PAGE_NUM ; m++){
-    printf("phys_free %d: %d\n", m, phys_page[m]);
-  }
+  printf("counter_swap: %d\n", counter);
 
 }
 
@@ -330,6 +289,120 @@ void *pm_free_wrapper(void *arg) {
 }
 
 
+//create a db file to write the data
+// void create_db_file(int index_swap) {
+//   FILE *fp;
+//   if ((fp = fopen("swapfile.txt", "w+")) == NULL) {
+//     printf("Cannot open file.\n");
+//     exit(1);
+//   }
+//   else {
+//     //write the index_swap into the file
+//     fwrite(&index_swap, sizeof(int), 1, fp);
+//     printf("Writing index_swap into the swapfile.bin.\n");
+//   }
+// }
 
 
+//remove the index_swap if db file with the index_swap num in it
+// void remove_index_swap(int index_swap) {
+//   FILE *fp;
+//   int index;
+//   if ((fp = fopen("swapfile.txt", "r+")) == NULL) {
+//     printf("Cannot open file.\n");
+//     exit(1);
+//   }
+//   else {
+//     while (fread(&index, sizeof(index), 1, fp) != 0) {
+//       if (index == index_swap) {
+//         //remove the index_swap from the file
+//         fseek(fp, -1 * sizeof(index), SEEK_CUR);
+//         memset(&index, 0, sizeof(index));
+//         fwrite(&index, sizeof(index), 1, fp);
+//         break;
+//       }
+//     }
+//     printf("Removing the index_swap from the swapfile.bin.\n");
+//   }
+//   //remove the db file if it is empty
+//   fseek(fp, 0, SEEK_END);
+//   long size = ftell(fp);
+//   if (size == 0) {
+//     remove("swapfile.bin");
+//     printf("Removing the swapfile.bin.\n");
+//   }
+//   fclose(fp);
+// }
 
+
+void storeArray(int index, int value){
+    FILE *fp;
+    char fileName[20];
+    sprintf(fileName, "%d.txt", index);
+
+    fp = fopen(fileName, "w");
+    if (fp == NULL)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(fp, "%d", value);
+    fclose(fp);
+}
+
+int removeFile(int index){
+    char fileName[20];
+    sprintf(fileName, "%d.txt", index);
+
+    int result = remove(fileName);
+    if (result == 0)
+        return 1;
+    else
+        return 0;
+}
+
+
+int fetchContent(int index){
+    FILE *fp;
+    char fileName[20];
+    sprintf(fileName, "%d.txt", index);
+
+    fp = fopen(fileName, "r");
+    if (fp == NULL)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    int value;
+    fscanf(fp, "%d", &value);
+    fclose(fp);
+    return value;
+}
+int *access_page(int num) {
+  pthread_mutex_lock(&pm_mutex);
+  if (num <0 || num >= (VIRTUAL_NUM - PAGE_NUM)){
+    return NULL;
+  }
+  printf("virtual_page[%d]:%d\n", num,virtual_page[num]);
+  //search the virtual page
+  if (virtual_page[num] == -1){
+    return NULL;
+  } else if (virtual_page[num] == -4){
+    for (int i =0; i< PAGE_NUM; i++){
+      if (virtual_page[i + VIRTUAL_NUM - PAGE_NUM] == num){
+        int file_fetched = fetchContent(num);
+        printf("value_fetched: %d\n", file_fetched);
+        return file_fetched;
+      }
+    }
+  } else {
+    int index = virtual_page[num];
+    printf("value_get: %d\n", phys_page[index]);
+    return phys_page[index];
+  }
+  return NULL;
+  pthread_mutex_lock(&pm_mutex);
+
+}
